@@ -1,0 +1,26 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: devops-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - app_net
+
+  app:
+    image: nginx:1.27-alpine
+    container_name: devops-app
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+    expose:
+      - "80"
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge

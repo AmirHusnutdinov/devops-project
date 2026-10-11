@@ -1,0 +1,14 @@
+project_name        = "khusnutdinovar-devops"
+external_network_id = "REPLACE_WITH_PROVIDER_EXTERNAL_NETWORK_ID"
+image_name          = "Ubuntu 22.04"
+flavor_name         = "m1.small"
+ssh_public_key_path = "/home/student/.ssh/id_ed25519.pub"
+allowed_ssh_cidr    = "REPLACE_WITH_YOUR_PUBLIC_IP/32"
+student_username    = "student"
+
+# Leave false for ordinary student credentials. A cloud administrator can set true
+# and provide the following values through a non-committed tfvars file or TF_VAR_*.
+manage_iam = false
+# iam_domain_id       = "REPLACE_WITH_KEYSTONE_DOMAIN_ID"
+# iam_project_id      = "REPLACE_WITH_PROJECT_ID"
+# vm_operator_role_id = "REPLACE_WITH_VM_OPERATOR_ROLE_ID"

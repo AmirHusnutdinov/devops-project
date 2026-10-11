@@ -1,0 +1,10 @@
+.idea/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.ansible/
+*.retry
+evidence/*.txt
+!evidence/.gitkeep
