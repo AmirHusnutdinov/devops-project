@@ -2,9 +2,11 @@
 .terraform/
 *.tfstate
 *.tfstate.*
+tfplan
 *.tfvars
 !terraform.tfvars.example
 .ansible/
 *.retry
+ansible/inventory.ini
 evidence/*.txt
 !evidence/.gitkeep

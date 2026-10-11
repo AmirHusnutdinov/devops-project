@@ -1,108 +1,91 @@
-# DevOps infrastructure foundation
+# ДЗ №1: фундамент DevOps-инфраструктуры
 
-Homework #1 for Amir Khusnutdinov (`khusnutdinovar`). The project implements a reproducible Ubuntu host using Terraform, Ansible, Docker Compose and a Bash health-check utility.
+ДЗ №1 по DevOps Engineering — Амир Хуснутдинов (`khusnutdinovar`).
 
-## Architecture
+## Что сделано
 
-```text
-Internet -> SSH/22 (trusted CIDR only) -> Ubuntu VM
-                                           |- Docker Engine
-                                           |- deployer (passwordless sudo, Docker group)
-                                           `- Docker Compose: nginx:80 -> app:80
-```
+- Terraform создаёт nginx-контейнер, bridge-сеть `khusnutdinovar-devops-network` и том `khusnutdinovar-devops-nginx-html`. Порт контейнера `80` опубликован на `8081`.
+- Ansible устанавливает Docker Engine и Compose на VM, включает Docker при загрузке и создаёт пользователя `deployer` с sudo без пароля и доступом к Docker.
+- Compose разворачивает на VM proxy nginx и внутренний nginx `app` с `Hello World`. Сервисы работают в своей сети `app_net`.
+- `scripts/monitor.sh` проверяет сервис через `systemctl`, при неактивном сервисе показывает журнал и считает ошибки в syslog.
 
-Terraform targets an OpenStack-compatible MWS project and creates a network, subnet, router, a VM, a floating IP, a key pair and a least-privilege security group. Cloud credentials are deliberately obtained from `OS_*` environment variables; neither credentials nor state are committed. The VM accepts SSH only from `allowed_ssh_cidr`.
+## Запуск
 
-`terraform/iam.tf` additionally defines an opt-in, project-scoped automation user and a role assignment. It is disabled by default because Keystone creates users and assignments only for a cloud administrator. When enabled, `vm_operator_role_id` must be supplied by the provider as a role limited to VM lifecycle actions; do not assign `admin`. The initial password must arrive via `TF_VAR_iam_password`, because user passwords are stored in Terraform state.
+### Terraform
 
-> The security-group requirement deliberately permits only SSH. To test `curl http://VM_IP` from outside the VM, an instructor-approved HTTP/80 rule must be added temporarily or the command should run on the VM as `curl http://localhost`.
-
-## Repository layout
-
-| Directory | Purpose |
-| --- | --- |
-| `terraform` | OpenStack-compatible infrastructure definition |
-| `ansible` | Ubuntu Docker setup and deployment of `/opt/app` |
-| `scripts` | Shell monitoring utility |
-| `evidence` | Local, ignored outputs/screenshots collected during validation |
-
-## Prerequisites
-
-- Terraform >= 1.5 and an OpenStack/MWS project credential set (`OS_AUTH_URL`, `OS_USERNAME`, `OS_PASSWORD`, `OS_PROJECT_NAME` or application credentials).
-- An SSH key pair and a trusted public source CIDR.
-- Ansible and the `community.docker` collection on the control host.
-
-## Provision infrastructure
+Terraform запускается на локальной машине с доступом к Docker Engine.
 
 ```bash
 cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit only the REPLACE_* values; do not add a real tfvars file to Git.
 terraform init
-terraform fmt -check
+terraform fmt -check -recursive
 terraform validate
 terraform plan -out=tfplan
 terraform apply tfplan
-terraform state list
+curl -i http://127.0.0.1:8081
 ```
 
-The generated floating IP is printed as `vm_public_ip`. If an instructor supplies an existing VM instead, use its IP in the Ansible inventory; Terraform remains the reproducible definition for a fresh lab environment.
+Если Docker-сокет недоступен текущему пользователю, один раз выполните `sudo usermod -aG docker "$USER"`, затем откройте новую сессию или выполните `newgrp docker`.
 
-## Configure host and deploy application
+### Ansible и Compose
+
+На управляющей машине:
 
 ```bash
 ansible-galaxy collection install -r ansible/requirements.yml
 cp ansible/inventory.ini.example ansible/inventory.ini
-# Confirm the host IP and SSH username in inventory.ini.
-ansible-playbook -i ansible/inventory.ini ansible/setup_host.yml --ask-become-pass
-ansible-playbook -i ansible/inventory.ini ansible/setup_host.yml --ask-become-pass
+# Укажите IP VM и пользователя student в ansible/inventory.ini.
+ansible-playbook -i ansible/inventory.ini ansible/setup_host.yml --ask-pass --ask-become-pass
 ```
 
-The second run must finish with `changed=0`. The playbook is idempotent: packages converge to `present`, users/directories/files use their desired state, and Compose is started only when its project files changed.
-
-On the VM, verify the stack:
+Проверка на VM:
 
 ```bash
-sudo -u deployer docker compose -f /opt/app/docker-compose.yml ps
-curl -fsS http://localhost
+sudo -iu deployer docker compose -f /opt/app/docker-compose.yml ps
+curl -i http://localhost
+sudo /opt/app/monitor.sh docker
 ```
 
-The externally reachable `nginx` service listens on port 80 and reverse-proxies to the private `app` service over the `app_net` bridge network. The app container has no published host port.
+## Результаты проверки
 
-## Monitoring utility
+### Terraform
 
-```bash
-chmod +x scripts/monitor.sh
-sudo scripts/monitor.sh docker
-sudo scripts/monitor.sh nonexistent.service  # expected: exit code 4
-```
+`terraform state list` подтверждает четыре управляемых ресурса: образ, контейнер, сеть и том. Контейнер запущен и публикует `8081 -> 80`; сеть содержит только Terraform nginx.
 
-The script validates its service argument, calls `systemctl is-active`, prints ten journal lines when the unit is inactive, and uses `grep` plus `awk` to count error-level messages from the last hour in `/var/log/syslog`. A missing syslog is reported explicitly rather than hidden.
+![Terraform state, контейнер и сеть](evidence/terraform-state-network.png)
 
-## Evidence for submission
+![Nginx подключён к отдельной сети](evidence/terraform-network-member.png)
 
-Run the following only against the real lab resources and save terminal output or screenshots under `evidence` locally (the directory is ignored to prevent accidental publication of IP addresses or logs):
+Том создан, `curl` возвращает `HTTP/1.1 200 OK`, а повторный `terraform plan` сообщает `No changes`.
 
-```bash
-terraform -chdir=terraform state list
-ansible-playbook -i ansible/inventory.ini ansible/setup_host.yml --ask-become-pass
-ssh student@VM_IP 'sudo -u deployer docker compose -f /opt/app/docker-compose.yml ps; curl -fsS http://localhost; sudo /opt/app/monitor.sh docker'
-```
+![Том, HTTP 200 и идемпотентность Terraform](evidence/terraform-volume-curl-idempotence.png)
 
-Do not fabricate evidence: as of project preparation, the supplied host did not complete an SSH handshake, so there is no claimed deployment output in this repository.
+### Ansible
 
-## Design decisions and troubleshooting
+Повторный запуск playbook завершился без ошибок и изменений: `changed=0`.
 
-- SSH ingress is narrowed to a single CIDR and Terraform rejects `0.0.0.0/0`; access is by uploaded key, not root login.
-- Terraform is declarative: it compares desired resources with `terraform.tfstate`. Removing state does not delete resources, but makes Terraform forget ownership and risks duplicate resources on the next apply.
-- Ansible is imperative in syntax but idempotent in modules: each task describes an end state and subsequent runs converge without changes.
-- The Compose proxy/app split models a multi-service deployment without exposing the backend. Use `journalctl -u docker -n 10`, `docker logs devops-proxy`, and `curl -v http://localhost` to diagnose failures.
+![Идемпотентный второй запуск Ansible](evidence/ansible-idempotence.png)
 
-## Git workflow
+### Мониторинг
 
-Work is prepared on `feature/infra-setup`. Before submitting, push it to the course remote, create a Merge Request into `main`, review it, merge it, then run:
+Скрипт подтверждает активное состояние Docker и выводит число ошибок в syslog.
 
-```bash
-git tag -a v0.1.0 -m 'DevOps infrastructure foundation'
-git push origin main --tags
-```
+![Результат monitor.sh](evidence/monitor.png)
+
+### Docker Compose
+
+Оба сервиса Compose запущены; proxy опубликован на `80`, а приложение доступно через него.
+
+![Compose ps и локальный curl](evidence/compose-local.png)
+
+Внешнее обращение к VM также возвращает `HTTP/1.1 200 OK` и страницу `Hello World`.
+
+![Внешний curl к VM](evidence/compose-external-curl.png)
+
+## Почему выбраны такие параметры
+
+- Порт `8081` выбран специально: по условию Terraform nginx должен отвечать на нестандартном порту.
+- Для Terraform nginx созданы отдельные сеть и том. Compose-сервисы находятся в другой сети `app_net` и с ним не пересекаются.
+- Terraform state и рабочий `inventory.ini` не попадают в Git: state нужен Terraform для отслеживания ресурсов, а inventory содержит адрес учебной VM.
+- После добавления пользователя в группу `docker` нужно открыть новую shell-сессию (`newgrp docker`), иначе Docker не даёт доступ к сокету.
+- Первый запрос к nginx был сделан сразу после `terraform apply` и соединение было сброшено. После завершения запуска контейнера повторный `curl` вернул `HTTP/1.1 200 OK`.

@@ -1,9 +1,19 @@
-output "vm_public_ip" {
-  description = "Public address to put into Ansible inventory."
-  value       = openstack_networking_floatingip_v2.vm.address
+output "nginx_url" {
+  description = "URL that must return HTTP 200 from the Terraform-managed nginx container."
+  value       = "http://127.0.0.1:${var.external_port}"
 }
 
-output "ssh_command" {
-  description = "Connection command; private key path is intentionally not managed by Terraform."
-  value       = "ssh ${var.student_username}@${openstack_networking_floatingip_v2.vm.address}"
+output "container_name" {
+  description = "Name of the Terraform-managed nginx container."
+  value       = docker_container.nginx.name
+}
+
+output "network_name" {
+  description = "Dedicated bridge network for the Terraform-managed nginx container."
+  value       = docker_network.nginx.name
+}
+
+output "volume_name" {
+  description = "Named volume mounted at nginx's web root."
+  value       = docker_volume.nginx_html.name
 }

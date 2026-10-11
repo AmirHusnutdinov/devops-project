@@ -1,13 +1,14 @@
 terraform {
   required_version = ">= 1.5.0"
+
   required_providers {
-    openstack = {
-      source  = "terraform-provider-openstack/openstack"
-      version = "~> 1.54"
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "~> 4.6"
     }
   }
 }
 
-provider "openstack" {
-  # Authentication is read from standard OS_* environment variables.
+provider "docker" {
+  host = var.docker_host
 }
