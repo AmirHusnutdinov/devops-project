@@ -45,6 +45,8 @@
         path: /etc/apt/keyrings/docker.asc
         state: file
         mode: '0644'
+      # In check mode the preceding curl command is deliberately not executed.
+      when: not ansible_check_mode
 
     - name: Configure Docker apt repository
       ansible.builtin.apt_repository:
