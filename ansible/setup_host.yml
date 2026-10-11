@@ -86,7 +86,8 @@
     - name: Permit deployer passwordless sudo
       ansible.builtin.copy:
         dest: "/etc/sudoers.d/{{ deployer_user }}"
-        content: "{{ deployer_user }} ALL=(ALL) NOPASSWD:ALL\\n"
+        content: |
+          {{ deployer_user }} ALL=(ALL) NOPASSWD:ALL
         owner: root
         group: root
         mode: '0440'
