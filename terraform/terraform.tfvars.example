@@ -1,0 +1,5 @@
+# The Docker socket used by Terraform. Keep the default for a local Docker Engine.
+# docker_host = "unix:///var/run/docker.sock"
+
+project_name  = "khusnutdinovar-devops"
+external_port = 8081

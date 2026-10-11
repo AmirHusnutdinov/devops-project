@@ -1,0 +1,3 @@
+[devops]
+# Replace with: terraform -chdir=../terraform output -raw vm_public_ip
+111.88.162.119 ansible_user=student
