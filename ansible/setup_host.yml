@@ -31,11 +31,20 @@
         mode: '0755'
 
     - name: Download Docker repository signing key
-      ansible.builtin.get_url:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        dest: /etc/apt/keyrings/docker.asc
+      # curl avoids a Python 3.12/urllib3 TLS incompatibility seen on Ubuntu 24.04.
+      # creates keeps the task idempotent on subsequent playbook runs.
+      ansible.builtin.command:
+        cmd: >-
+          curl --fail --silent --show-error --location
+          https://download.docker.com/linux/ubuntu/gpg
+          --output /etc/apt/keyrings/docker.asc
+        creates: /etc/apt/keyrings/docker.asc
+
+    - name: Set Docker repository signing key permissions
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/docker.asc
+        state: file
         mode: '0644'
-        force: false
 
     - name: Configure Docker apt repository
       ansible.builtin.apt_repository:
